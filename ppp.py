@@ -1,5 +1,6 @@
 """Path Pretty Printer"""
 
+from abc import ABC, abstractmethod
 import os
 
 TVERTICAL   = '│  '
@@ -8,26 +9,52 @@ TLAST       = '└──'
 TSPACE      = '   '
 
         
-class File():
+class DiskItem(ABC):
+    """Represent item of disk. May be a file or folder.
+    
+    Attributes:
+    - path: path of this item (including the directory path and the name of the item)
+    - name: name of this item
+    """
     def __init__(self, path:str) -> None:
         self._checkPath(path)
         self.path = path
         self.name = os.path.basename(path)
         
-    def _checkPath(self, path:str):
+    @abstractmethod
+    def _checkPath(self, path:str) -> None:
+        ...
+            
+    def getTypeName(self) -> str:
+        return self.__class__.__name__
+        
+    def __str__(self) -> str:
+        return self.name
+
+        
+class File(DiskItem):
+    """Represent file of disk
+    
+    Attributes:
+    - path: path of this file (including the directory path and the name of the file)
+    - name: name of this file
+    """
+    def _checkPath(self, path:str) -> None:
         if os.path.isfile(path) is False:
             raise OSError("Path is not file or nonexistent")
-            
-    def _type(self):
-        return "File"
+
         
-    def __repr__(self) -> str:
-        return self.name
-        
-class Folder(File):
+class Folder(DiskItem):
+    """Represent folder of disk
+    
+    Attributes:
+    - path: path of this folder (including the directory path and the name of the folder)
+    - name: name of this folder
+    - childs: items this folder contain. May be files or folders
+    """
     def __init__(self, path:str) -> None:
         super().__init__(path)
-        self.childs:list[File] = []
+        self.childs:list[File | Folder] = []
         
         childs = os.listdir(path)
         for child in childs:
@@ -40,14 +67,11 @@ class Folder(File):
                 raise OSError("Child directory is not file or folder")
             self.childs.append(c)
             
-    def _checkPath(self, path: str):
+    def _checkPath(self, path: str) -> None:
         if os.path.isdir(path) is False:
             raise OSError("Path is not folder or nonexistent")
-            
-    def _type(self):
-        return "Folder"
         
-    def __repr__(self) -> str:
+    def __str__(self) -> str:
         return f"{self.name}{self.childs}"
 
     
@@ -56,10 +80,10 @@ def _pretty(item: File | Folder, trees:list=[], postfix='', lastParent=True,isRo
     for tree in trees:
         t += tree
         
-    if not isinstance(item, Folder):
+    if isinstance(item, File):
         print(f"{t}{postfix}─{item.name}")
     
-    if isinstance(item, Folder):
+    elif isinstance(item, Folder):
         if isRoot:
             print(f"{item.name}")
         else:
@@ -80,12 +104,13 @@ def _pretty(item: File | Folder, trees:list=[], postfix='', lastParent=True,isRo
                 childPrefix = TLAST
                 lastChild = True
             _pretty(child, localtrees, childPrefix, lastChild)
+            
+    else:
+        raise TypeError("Not a file or folder object")
 
 def PrintFolder(path:str):
     """Pretty print folder structure.
     Path is assumed to be folder directory."""
-    if os.path.isdir(path) is False:
-        raise OSError("Path is not folder or nonexistent")
         
     folder = Folder(path)
     _pretty(folder, isRoot=True)
